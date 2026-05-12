@@ -1,0 +1,402 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartShop AI | Next-Gen Billing</title>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-white min-h-screen font-sans">
+
+    <nav class="fixed bottom-0 w-full bg-slate-800/50 backdrop-blur-lg border-t border-white/10 z-50 flex justify-around p-4 md:top-0 md:bottom-auto md:flex-col md:w-20 md:h-full">
+        <button onclick="showSection('dashboard')" class="nav-btn active"><i class="fas fa-chart-line text-xl"></i></button>
+        <button onclick="showSection('billing')" class="nav-btn"><i class="fas fa-file-invoice-dollar text-xl"></i></button>
+        <button onclick="showSection('inventory')" class="nav-btn"><i class="fas fa-boxes text-xl"></i></button>
+        <button onclick="showSection('customers')" class="nav-btn"><i class="fas fa-users text-xl"></i></button>
+    </nav>
+
+    <main class="pb-24 md:pl-24 p-6 max-w-7xl mx-auto">
+        
+        <section id="dashboard" class="content-section">
+            <header class="mb-8">
+                <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">Business Overview</h1>
+                <p class="text-slate-400">Welcome back, Admin</p>
+            </header>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="glass-card p-6">
+                    <p class="text-slate-400 text-sm">Today's Sales</p>
+                    <h2 class="text-2xl font-bold" id="stat-sales">₹0</h2>
+                </div>
+                <div class="glass-card p-6">
+                    <p class="text-slate-400 text-sm">Pending Dues</p>
+                    <h2 class="text-2xl font-bold text-red-400" id="stat-dues">₹0</h2>
+                </div>
+                <div class="glass-card p-6">
+                    <p class="text-slate-400 text-sm">Total Customers</p>
+                    <h2 class="text-2xl font-bold" id="stat-cust">0</h2>
+                </div>
+                <div class="glass-card p-6">
+                    <p class="text-slate-400 text-sm">Stock Alerts</p>
+                    <h2 class="text-2xl font-bold text-orange-400" id="stat-stock">0</h2>
+                </div>
+            </div>
+        </section>
+
+        <section id="billing" class="content-section hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">New Billing</h2>
+                <div class="flex gap-2">
+                    <button onclick="startVoiceAI()" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg flex items-center gap-2">
+                        <i class="fas fa-microphone"></i> AI Voice
+                    </button>
+                    <button onclick="toggleScanner()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 rounded-lg flex items-center gap-2">
+                        <i class="fas fa-barcode"></i> Scan
+                    </button>
+                </div>
+            </div>
+
+            <div id="reader" class="mb-4 overflow-hidden rounded-xl bg-black"></div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 glass-card p-4">
+                    <table class="w-full text-left">
+                        <thead class="border-b border-white/10">
+                            <tr>
+                                <th class="pb-3">Item</th>
+                                <th class="pb-3 text-center">Qty</th>
+                                <th class="pb-3 text-right">Price</th>
+                                <th class="pb-3 text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cart-items">
+                            </tbody>
+                    </table>
+                </div>
+
+                <div class="glass-card p-6 h-fit">
+                    <input type="text" id="cust-name" placeholder="Customer Name" class="w-full bg-slate-700/50 border border-white/10 rounded-lg p-3 mb-4 outline-none">
+                    <div class="flex justify-between mb-2 text-slate-400">
+                        <span>Subtotal</span>
+                        <span id="bill-subtotal">₹0.00</span>
+                    </div>
+                    <div class="flex justify-between mb-4 font-bold text-xl border-t border-white/10 pt-4">
+                        <span>Grand Total</span>
+                        <span id="bill-total">₹0.00</span>
+                    </div>
+                    <button onclick="finalizeBill()" class="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-bold py-4 rounded-xl shadow-lg transition-transform active:scale-95">
+                        GENERATE BILL & SHARE
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="inventory" class="content-section hidden">
+            <div class="flex justify-between mb-6">
+                <h2 class="text-2xl font-bold">Inventory</h2>
+                <button onclick="toggleModal('product-modal')" class="bg-blue-600 px-4 py-2 rounded-lg">+ Add Product</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="inventory-list"></div>
+        </section>
+
+    </main>
+
+    <div id="ai-overlay" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[100] hidden flex flex-col items-center justify-center p-6 text-center">
+        <div class="w-24 h-24 bg-indigo-500 rounded-full animate-pulse mb-6 flex items-center justify-center">
+            <i class="fas fa-microphone text-4xl"></i>
+        </div>
+        <h2 class="text-2xl font-bold mb-2" id="ai-status">Listening...</h2>
+        <p class="text-slate-400 max-w-sm" id="ai-transcript">Try saying: "Rahim ko 2 kg rice do"</p>
+        <button onclick="stopVoiceAI()" class="mt-8 text-slate-400 underline">Cancel</button>
+    </div>
+
+    <div id="product-modal" class="fixed inset-0 bg-black/50 z-[60] hidden flex items-center justify-center p-4">
+        <div class="glass-card w-full max-w-md p-6">
+            <h3 class="text-xl font-bold mb-4">Add Product</h3>
+            <input type="text" id="p-name" placeholder="Product Name" class="input-field">
+            <input type="text" id="p-barcode" placeholder="Barcode" class="input-field">
+            <div class="flex gap-2">
+                <input type="number" id="p-price" placeholder="Price per Unit" class="input-field">
+                <select id="p-unit" class="input-field">
+                    <option value="kg">kg</option>
+                    <option value="gram">gram</option>
+                    <option value="pcs">pcs</option>
+                    <option value="litre">litre</option>
+                </select>
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button onclick="saveProduct()" class="flex-1 bg-emerald-500 p-3 rounded-lg font-bold">Save</button>
+                <button onclick="toggleModal('product-modal')" class="flex-1 bg-slate-700 p-3 rounded-lg">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+:root {
+    --glass: rgba(255, 255, 255, 0.05);
+    --border: rgba(255, 255, 255, 0.1);
+}
+
+.glass-card {
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 1.5rem;
+}
+
+.nav-btn {
+    @apply p-4 rounded-xl text-slate-400 transition-all duration-300;
+}
+
+.nav-btn.active {
+    @apply bg-indigo-500/20 text-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.3)];
+}
+
+.input-field {
+    @apply w-full bg-slate-800/50 border border-white/10 rounded-lg p-3 mb-3 outline-none focus:border-indigo-500;
+}
+
+.animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
+}
+// 1. DATABASE CONFIGURATION (IndexedDB using Vanilla Wrapper)
+const DB_NAME = "SmartShopDB";
+let db;
+
+const initDB = () => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (e) => {
+        db = e.target.result;
+        db.createObjectStore("products", { keyPath: "id", autoIncrement: true });
+        db.createObjectStore("customers", { keyPath: "phone" });
+        db.createObjectStore("sales", { keyPath: "id", autoIncrement: true });
+    };
+    request.onsuccess = (e) => {
+        db = e.target.result;
+        loadInventory();
+        updateDashboard();
+    };
+};
+
+// 2. STATE MANAGEMENT
+let cart = [];
+let html5QrCode;
+
+// 3. AI VOICE PROCESSING (Speech to Data)
+const startVoiceAI = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return alert("Speech Recognition not supported");
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'hi-IN'; // Supports Hindi + English
+    
+    document.getElementById('ai-overlay').classList.remove('hidden');
+    recognition.start();
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        document.getElementById('ai-transcript').innerText = transcript;
+        processAICommand(transcript);
+        setTimeout(() => stopVoiceAI(), 2000);
+    };
+};
+
+const stopVoiceAI = () => {
+    document.getElementById('ai-overlay').classList.add('hidden');
+};
+
+const processAICommand = (text) => {
+    // Regex for parsing: "2 kg rice", "500 gram sugar", "Rahim ko..."
+    const qtyMatch = text.match(/(\d+)\s*(kg|gram|g|ml|litre|pcs|pc|pen|notebook)/i);
+    const itemMatch = text.replace(/(\d+)\s*(kg|gram|g|ml|litre|pcs|pc|add|do|karo)/gi, '').trim();
+
+    if (qtyMatch && itemMatch) {
+        const qty = parseFloat(qtyMatch[1]);
+        const unit = qtyMatch[2];
+        
+        // Find product in DB
+        const transaction = db.transaction(["products"], "readonly");
+        const store = transaction.objectStore("products");
+        store.getAll().onsuccess = (e) => {
+            const products = e.target.result;
+            const product = products.find(p => itemMatch.includes(p.name.toLowerCase()));
+            
+            if (product) {
+                addToCart(product, qty, unit);
+            } else {
+                alert(`Product "${itemMatch}" not found in inventory.`);
+            }
+        };
+    }
+    
+    // Customer Name detection "Rahim ko..."
+    if (text.includes("ko")) {
+        const name = text.split("ko")[0].trim();
+        document.getElementById('cust-name').value = name;
+    }
+};
+
+// 4. BILLING LOGIC
+const addToCart = (product, qty, unit) => {
+    let finalPrice = product.price;
+    
+    // Weight Calculation (Smart Conversion)
+    if (unit === 'gram' || unit === 'g') {
+        finalPrice = (product.price * qty) / 1000;
+    } else if (unit === 'ml') {
+        finalPrice = (product.price * qty) / 1000;
+    } else {
+        finalPrice = product.price * qty;
+    }
+
+    cart.push({ ...product, qty, unit, total: finalPrice });
+    renderCart();
+};
+
+const renderCart = () => {
+    const tbody = document.getElementById('cart-items');
+    tbody.innerHTML = cart.map((item, index) => `
+        <tr class="border-b border-white/5">
+            <td class="py-4">${item.name}</td>
+            <td class="text-center">${item.qty} ${item.unit}</td>
+            <td class="text-right">₹${item.price}</td>
+            <td class="text-right font-bold">₹${item.total.toFixed(2)}</td>
+        </tr>
+    `).join('');
+    
+    const grandTotal = cart.reduce((sum, item) => sum + item.total, 0);
+    document.getElementById('bill-total').innerText = `₹${grandTotal.toFixed(2)}`;
+    document.getElementById('bill-subtotal').innerText = `₹${grandTotal.toFixed(2)}`;
+};
+
+// 5. BARCODE SCANNER
+const toggleScanner = () => {
+    const readerDiv = document.getElementById('reader');
+    if (html5QrCode) {
+        html5QrCode.stop();
+        html5QrCode = null;
+        readerDiv.classList.add('hidden');
+    } else {
+        readerDiv.classList.remove('hidden');
+        html5QrCode = new Html5Qrcode("reader");
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: 250 },
+            (decodedText) => {
+                findAndAddByBarcode(decodedText);
+                toggleScanner();
+            }
+        );
+    }
+};
+
+const findAndAddByBarcode = (code) => {
+    const store = db.transaction("products").objectStore("products");
+    store.getAll().onsuccess = (e) => {
+        const p = e.target.result.find(item => item.barcode === code);
+        if (p) addToCart(p, 1, p.unit);
+    };
+};
+
+// 6. UTILITIES
+const showSection = (id) => {
+    document.querySelectorAll('.content-section').forEach(s => s.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+};
+
+const toggleModal = (id) => document.getElementById(id).classList.toggle('hidden');
+
+const saveProduct = () => {
+    const p = {
+        name: document.getElementById('p-name').value,
+        barcode: document.getElementById('p-barcode').value,
+        price: parseFloat(document.getElementById('p-price').value),
+        unit: document.getElementById('p-unit').value,
+        stock: 100
+    };
+    const tx = db.transaction("products", "readwrite");
+    tx.objectStore("products").add(p);
+    tx.oncomplete = () => {
+        toggleModal('product-modal');
+        loadInventory();
+    };
+};
+
+const loadInventory = () => {
+    const store = db.transaction("products").objectStore("products");
+    store.getAll().onsuccess = (e) => {
+        const list = document.getElementById('inventory-list');
+        list.innerHTML = e.target.result.map(p => `
+            <div class="glass-card p-4 flex justify-between items-center">
+                <div>
+                    <h4 class="font-bold">${p.name}</h4>
+                    <p class="text-sm text-slate-400">₹${p.price}/${p.unit}</p>
+                </div>
+                <div class="text-emerald-400 font-mono text-xs">${p.barcode}</div>
+            </div>
+        `).join('');
+    };
+};
+
+const finalizeBill = () => {
+    const customer = document.getElementById('cust-name').value || "Cash Customer";
+    const total = document.getElementById('bill-total').innerText;
+    const msg = `*Thank you for shopping at SmartShop!*%0A%0A*Customer:* ${customer}%0A*Total:* ${total}%0AItems: ${cart.map(i => i.name).join(', ')}`;
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
+    
+    // Save transaction
+    const tx = db.transaction("sales", "readwrite");
+    tx.objectStore("sales").add({ customer, total, items: cart, date: new Date() });
+    cart = [];
+    renderCart();
+};
+
+initDB();
+{
+  "name": "SmartShop AI Assistant",
+  "short_name": "SmartShop",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3081/3081840.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+const CACHE_NAME = 'smartshop-v1';
+const assets = [
+  '/',
+  '/index.html',
+  '/style.css',
+  '/app.js',
+  'https://cdn.tailwindcss.com',
+  'https://unpkg.com/html5-qrcode'
+];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(assets)));
+});
+
+self.addEventListener('fetch', e => {
+  e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+});
+
